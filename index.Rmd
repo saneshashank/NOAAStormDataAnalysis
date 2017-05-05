@@ -1,0 +1,236 @@
+---
+title: "NOAA Storm Data Analysis - top severe weather events"
+author: "Shashank Sane"
+date: "September 4, 2016"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+## Synopsis
+
+This article examines the U.S. National Ocean and Atmospheric administration (NOAA) Storm database and finds out the top 10 severe weather events in terms of health impact (fatalities and injures) and it terms of economic impact(property and crop damage). The study finds that the top weather event in terms of health impact is Heat,while in terms of property damage and crop damage is flood and drought respectively.The NOAA data has been collected starting from 1950 to 2011.
+
+### load required libraries
+```{r chunk1}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+```
+
+### load the data file
+```{r chunk2}
+## url of the file
+fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+## Destination file name
+DestinationFile <- "FStormData.csv.bz2"
+
+## Download file if does not exist in workspace
+if (!file.exists(DestinationFile)){
+  download.file(fileURL, DestinationFile)
+}
+
+## read file into data frame
+dfStormData <- read.csv(DestinationFile,header = TRUE,stringsAsFactors = FALSE)
+
+```
+
+## Data Processing
+
+The NOAA storm database (https://www.ncdc.noaa.gov/stormevents/details.jsp?type=eventtype) indicates  that data for all event categories is available only after 1996 onward, so we would select data for period 1996-2011 so that the events which were measured before 1950 do not bias the findings. We also observe that in many events values of all parameters for fatalities, injuries, property damage and crop damage are zero, we would also ignore such data as they do not contribute to the investigation.
+```{r chunk 3}
+
+## Select only required columns
+dfStormData <- select(dfStormData,BGN_DATE,EVTYPE,FATALITIES,INJURIES,PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP)
+
+## Convert BGN_DATE to datetime
+dfStormData <- mutate(dfStormData,BGN_DATE = mdy_hms(BGN_DATE))
+
+## All event types are available from 1996 onwards, so filter all events 1996 onwards.
+dfStormData <- filter(dfStormData,BGN_DATE >= "1996-01-01")
+
+## Remove all those data cases where fatalities,injuries, property damage and crop damage
+## are all zero since this will not impact our analysis.
+dfStormData <- filter(dfStormData,!(FATALITIES==0 & INJURIES==0 & PROPDMG==0 & CROPDMG==0)) 
+
+```
+
+We also observe that while the NOAA storm data indicates 48 event type the actual data contain a lot more events, so we would try to clean event types to ignore minor differences like casing and minor changes in descriptions. We further observe that many event types are of category summary which do not fall into any of the event types so we would remove such cases from our analysis. The event types are referred to from https://www.ncdc.noaa.gov/stormevents/pd01016005curr.pdf, section 2.1.1, page 6 - Storm Data Event table
+```{r chunk 4}
+## Change all the Event values to upper case
+dfStormData <- mutate(dfStormData, EVTYPE = toupper(EVTYPE))
+
+## Remove all those event type values which are summmary as this does not belong to any event type
+dfStormData <- dfStormData[!grepl("SUMMARY",dfStormData$EVTYPE),]
+
+## Extract event type list
+EventList <- dfStormData$EVTYPE
+
+## Try to assign all the different events into the 48 event types defined
+EventList[grepl("ASTRONOMICAL LOW|ASTRONOMICAL HIGH TIDE",EventList)] <- "ASTRONOMICAL LOW"
+EventList[grepl("AVALANCHE",EventList)] <- "AVALANCHE"
+EventList[grepl("BLIZZARD",EventList)] <- "BLIZZARD"
+EventList[grepl("COASTAL FLOOD",EventList)] <- "COASTAL FLOOD"
+EventList[grepl("COLD/WIND CHILL|COLD",EventList)] <- "COLD/WIND CHILL"
+EventList[grepl("DEBRIS FLOW",EventList)] <- "DEBRIS FLOW"
+EventList[grepl("DENSE FOG|FOG",EventList)] <- "DENSE FOG"
+EventList[grepl("DENSE SMOKE",EventList)] <- "DENSE SMOKE"
+EventList[grepl("DROUGHT",EventList)] <- "DROUGHT"
+EventList[grepl("DUST DEVIL",EventList)] <- "DUST DEVIL"
+EventList[grepl("DUST STORM|BLOWING DUST",EventList)] <- "DUST STORM"
+EventList[grepl("EXCESSIVE HEAT",EventList)] <- "EXCESSIVE HEAT"
+EventList[grepl("EXTREME COLD/WIND CHILL|EXTREME COLD|EXTREME WINDCHILL",EventList)] <- "EXTREME COLD/WIND CHILL"
+EventList[grepl("FLASH FLOOD",EventList)] <- "FLASH FLOOD"
+EventList[grepl("FLOOD",EventList)] <- "FLOOD"
+EventList[grepl("FROST/FREEZE|AGRICULTURAL FREEZE|DAMAGING FREEZE|EARLY FROST|FREEZE|FROST",EventList)] <- "FROST/FREEZE"
+EventList[grepl("FUNNEL CLOUD",EventList)] <- "FUNNEL CLOUD"
+EventList[grepl("FREEZING FOG",EventList)] <- "FREEZING FOG"
+EventList[grepl("HAIL",EventList)] <- "HAIL"
+EventList[grepl("HEAT",EventList)] <- "HEAT"
+EventList[grepl("HEAVY RAIN",EventList)] <- "HEAVY RAIN"
+EventList[grepl("HEAVY SNOW",EventList)] <- "HEAVY SNOW"
+EventList[grepl("HIGH SURF|HEAVY SURF|HEAVY SURF AND WIND|HIGH SURF|HIGH SWELLS|HAZARDOUS SURF",EventList)] <- "HIGH SURF"
+EventList[grepl("HIGH WIND",EventList)] <- "HIGH WIND"
+EventList[grepl("HURRICANE|TYPHOON|HURRICANE (TYPHOON)",EventList)] <- "HURRICANE (TYPHOON)"
+EventList[grepl("ICE STORM",EventList)] <- "ICE STORM"
+EventList[grepl("LAKE ",EventList)] <- "LAKE EFFECT"
+EventList[grepl("LAKESHORE FLOOD",EventList)] <- "LAKESHORE FLOOD"
+EventList[grepl("LIGHTNING",EventList)] <- "LIGHTNING"
+EventList[grepl("MARINE HAIL",EventList)] <- "MARINE HAIL"
+EventList[grepl("MARINE HIGH WIND",EventList)] <- "MARINE HIGH WIND"
+EventList[grepl("MARINE STRONG WIND",EventList)] <- "MARINE STRONG WIND"
+EventList[grepl("MARINE THUDERSTORM WIND",EventList)] <- "MARINE THUDERSTORM WIND"
+EventList[grepl("RIP CURRENT",EventList)] <- "RIP CURRENT"
+EventList[grepl("SEICHE",EventList)] <- "SEICHE"
+EventList[grepl("SLEET",EventList)] <- "SLEET"
+EventList[grepl("STORM SURGE/TIDE|STORM SURGE",EventList)] <- "STORM SURGE/TIDE"
+EventList[grepl("STRONG WIND|GUSTY WIND|GUSTY WINDS|GRADIENT WIND",EventList)] <- "STRONG WIND"
+EventList[grepl("THUNDERSTORM|THUNDERSTORM WIND|TSTM WIND|COASTAL STORM|COASTALSTORM",EventList)] <- "THUNDERSTORM WIND"
+EventList[grepl("TORNADO",EventList)] <- "TORNADO"
+EventList[grepl("TROPICAL DEPRESSION",EventList)] <- "TROPICAL DEPRESSION"
+EventList[grepl("TROPICAL STORM",EventList)] <- "TROPICAL STORM"
+EventList[grepl("TSUNAMI",EventList)] <- "TSUNAMI"
+EventList[grepl("VOLCANIC",EventList)] <- "VOLCANIC ASH"
+EventList[grepl("WATERSPOUT",EventList)] <- "WATERSPOUT"
+EventList[grepl("WILDFIRE",EventList)] <- "WILDFIRE"
+EventList[grepl("WINTER STORM",EventList)] <- "WINTER STORM"
+EventList[grepl("WINTER WEATHER",EventList)] <- "WINTER WEATHER"
+EventList[grepl("LANDSLIDE|LANDS|MUDSLIDE|MUD SLIDE|ROCK SLIDE",EventList)] <- "LANDSLIDE"
+
+## Assign back the event list
+dfStormData$EVTYPE <- EventList
+
+## Convert event type (EVTYPE) to factor variable
+dfStormData <- transform(dfStormData, EVTYPE = as.factor(EVTYPE))
+
+
+```
+
+For Health Impact analysis we group the data based on event type and find the sum of fatalities and injures for each event, the ranking of the event is arrived by descending order of fatalities and injuries.
+```{r chunk5}
+## group based on event type,  summarise and arrange for fatalities and injuries
+dfHealthImpact <- group_by(dfStormData,EVTYPE)%>%
+                  summarise(Fatalities= sum(FATALITIES),Injuries = sum(INJURIES))%>%
+                  arrange(desc(Fatalities),desc(Fatalities))
+
+## Select top 10 events
+dfHealthImpact <- head(dfHealthImpact,10)
+
+## tranform the fatalities anf Injuries into single variable called Type
+dfTotalHealthImpact <- gather(dfHealthImpact,Type,Count,-EVTYPE)
+
+```
+
+For Economic Impact look and property damage and crop damage separate and create two sets of data. The events are grouped and summarized base on property damage and crop damage. But first we must calculate the actual valuation based on factor for property damage and crop damage to be derive from column PROPDMGEXP and CROPDMGEXP columns.Alphabetical characters used to signify magnitude include "K" for thousands, "M" for millions, and "B" for billions (page 12- https://www.ncdc.noaa.gov/stormevents/pd01016005curr.pd)
+
+```{r chunk 6}
+## Create a function to find multiplication factor:
+multiple_factor <- function(x)
+{
+  if(x=="K")
+  {
+    multiplier=1
+  }
+  if(x=="M")
+  {
+    multiplier= 1000
+  }
+  if(x=="B")
+  {
+    multiplier=1000000
+  }
+  else if(x==""|x==0)
+  {
+    multiplier= 0
+  }
+  multiplier
+}
+
+## Create a new colum property_damage by using lapply to apply function multiple_factor on PROPDMGEXP column
+dfStormData$property_damage <- unlist(lapply(dfStormData$PROPDMGEXP,multiple_factor)) 
+
+## Similarly Create a new colum Crop_damage by using lapply to apply function multiple_factor on CROPDMGEXP column
+dfStormData$crop_damage <- unlist(lapply(dfStormData$CROPDMGEXP,multiple_factor))
+
+## Now calculate the actuali property damage and crop damage value by multiplying property_damage and PROPDMG and crop_damage and CROPDMG
+dfStormData <- mutate(dfStormData,property_damage =PROPDMG*property_damage,crop_damage = crop_damage*CROPDMG)
+
+## Group by events and find total property damage for each event
+dfPropDmg <- group_by(dfStormData,EVTYPE)%>%
+             summarise(total_property_damage=sum(property_damage))%>%
+             arrange(desc(total_property_damage)) 
+
+
+## Group by events and find total crop damage for each event
+dfCropDmg <- group_by(dfStormData,EVTYPE)%>%
+             summarise(total_crop_damage=sum(crop_damage))%>%
+             arrange(desc(total_crop_damage))  
+
+
+## Since the values are scaled in 1000as we set K==1, lets divide by 1000000 to get valuation in billions
+dfPropDmg <- mutate(dfPropDmg,total_property_damage=total_property_damage/1000000 )
+dfCropDmg <- mutate(dfCropDmg,total_crop_damage=total_crop_damage/1000000 )
+
+```
+
+
+## Results
+### Top 10 Events with the greatest health impact
+```{r chunk 7}
+## take top 10 events for health impact and view them
+kable(dfHealthImpact)
+
+## draw plot to show the top 10 health Impact Events
+p <- ggplot(data=dfTotalHealthImpact)
+p+theme(axis.text.x = element_text(angle = 45, hjust = 1)) +geom_bar(mapping = aes(x=EVTYPE,y=Count, fill=Type),stat = "identity")+facet_wrap(~Type,scales = "free")+xlab(" Events")+labs(title="NOAA Top 10 Storm Events - Health Impact")
+
+```
+
+Surprisingly the top health impact event is heat, which suggests that promoting precautionary measures for sufficient body hydration can have a siginificant impact on reducing heat related health incidents.
+
+### Top 10 events with greatest economic impact
+```{r chunk 8}
+## take the top ten values for both property damage and crop damage
+dfPropDmg  <- head(dfPropDmg,10)
+dfCropDmg  <- head(dfCropDmg,10)
+
+## View as table
+kable(dfPropDmg)
+kable(dfCropDmg)
+
+## Create graph for property damage
+p <- ggplot(data=dfPropDmg)
+p + geom_bar(mapping = aes(x=EVTYPE,y=total_property_damage),stat = "identity")+xlab("Events")+ylab("Property damage in billion dollars")+coord_flip()+labs(title="NOAA Top 10 Storm Events - Property Damage")
+
+## Create graph for crop damage
+p <- ggplot(data=dfCropDmg)
+p + geom_bar(mapping = aes(x=EVTYPE,y=total_crop_damage),stat = "identity")+xlab("Events")+ylab("Crop damage in billion dollars")+coord_flip()+labs(title="NOAA Top 10 Storm Events - Crop Damage")
+
+```
+
+The above analysis shows that flood and drought cycle continues to have significant economic impact. 
