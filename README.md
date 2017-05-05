@@ -1,0 +1,2 @@
+# NOAAStormDataAnalysis
+This article examines the U.S. National Ocean and Atmospheric administration (NOAA) Storm database and finds out the top 10 severe weather events in terms of health impact (fatalities and injures) and it terms of economic impact(property and crop damage). The study finds that the top weather event in terms of health impact is Heat,while in terms of property damage and crop damage is flood and drought respectively.The NOAA data has been collected starting from 1950 to 2011.
